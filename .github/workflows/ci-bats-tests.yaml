@@ -1,0 +1,55 @@
+name: Dolt bats tests
+
+on:
+  push:
+    branches: [ db/ci-github-actions-bats ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  test:
+    name: Bats tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+    steps:
+      - name: Setup Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.13
+        id: go
+      - name: Setup Python 3.x
+        uses: actions/setup-python@v2
+        with:
+          python-version: ^3.6
+      - name: Create CI Bin
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/bin
+      - name: Install Doltpy
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install doltpy
+      - name: Install Dolt
+        working-directory: ./go
+        run: |
+          go build -mod=readonly -o $GITHUB_WORKSPACE/bin/dolt ./cmd/dolt/.
+          go build -mod=readonly -o $GITHUB_WORKSPACE/bin/git-dolt ./cmd/git-dolt/.
+          go build -mod=readonly -o $GITHUB_WORKSPACE/bin/git-dolt-smudge ./cmd/git-dolt-smudge/.
+          echo "::add-path::$GITHUB_WORKSPACE/bin"
+          chmod +x $GITHUB_WORKSPACE/bin/dolt
+          chmod +x $GITHUB_WORKSPACE/bin/git-dolt
+          chmod +x $GITHUB_WORKSPACE/bin/git-dolt-smudge
+      - name: Setup Dolt Config
+        run: |
+          dolt config --global --add user.name 'Liquidata Actions'
+          dolt config --global --add user.email 'actions@liquidata.co'
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 14
+      - run: npm install -g bats
+      - run: bats arg-parsing.bats
+        working-directory: ./bats
